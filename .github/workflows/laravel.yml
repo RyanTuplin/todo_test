@@ -19,8 +19,8 @@ jobs:
           php-version: '8.1'
           extensions: mbstring, bcmath, xml, fileinfo, sqlite
 
-      - name: Copy testing env
-        run: cp .env.testing .env
+      - name: Copy .env
+        run: cp .env.example .env
 
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
@@ -31,17 +31,18 @@ jobs:
       - name: Set directory permissions
         run: chmod -R 777 storage bootstrap/cache database
 
+      - name: Create SQLite database
+        run: touch database/database.sqlite
+
       - name: Run migrations
         env:
           DB_CONNECTION: sqlite
-          DB_DATABASE: ':memory:'
-          APP_ENV: testing
+          DB_DATABASE: database/database.sqlite
         run: php artisan migrate --force
 
       - name: Run tests
         env:
           DB_CONNECTION: sqlite
-          DB_DATABASE: ':memory:'
+          DB_DATABASE: database/database.sqlite
           APP_ENV: testing
-          MAIL_MAILER: log
         run: php artisan test
