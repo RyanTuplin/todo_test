@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Actions\UpdateTodoAction;
 use App\DataTransferObjects\TodoData;
 use App\Models\Todo;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -15,10 +16,12 @@ class UpdateTodoActionTest extends TestCase
    /** @test */
    public function it_updates_a_todo()
    {
-      $todo = Todo::create([
+      $user = User::factory()->create();
+
+      $todo = Todo::factory()->for($user)->create([
          'title' => 'Original Title',
          'description' => 'Original Description',
-         'completed' => false,
+         'completed' => 0,
       ]);
 
       $todoData = new TodoData(
@@ -35,6 +38,7 @@ class UpdateTodoActionTest extends TestCase
       $this->assertTrue($updatedTodo->completed);
       $this->assertDatabaseHas('todos', [
          'id' => $todo->id,
+         'user_id' => $user->id,
          'title' => 'Updated Title',
       ]);
    }
@@ -42,9 +46,11 @@ class UpdateTodoActionTest extends TestCase
    /** @test */
    public function it_can_toggle_completed_status()
    {
-      $todo = Todo::create([
+      $user = User::factory()->create();
+
+      $todo = Todo::factory()->for($user)->create([
          'title' => 'Test Todo',
-         'completed' => false,
+         'completed' => 0,
       ]);
 
       $todoData = new TodoData(

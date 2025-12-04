@@ -15,7 +15,9 @@ class StoreTodoController extends Controller
     public function __invoke(StoreTodoRequest $request, CreateTodoAction $action)
     {
         $todoData = TodoData::fromRequest($request->validated());
-        $todo = $action->execute($todoData);
+
+        $todo = $action->execute($todoData, $request->user());
+        
         return (new TodoResource($todo))->response()->setStatusCode(201);
     }
 }

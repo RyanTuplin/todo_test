@@ -14,6 +14,8 @@ class DeleteTodoController extends Controller
      */
     public function __invoke(Todo $todo, DeleteTodoAction $action): Response
     {
+        $this->authorize('delete', $todo);
+
         $action->execute($todo);
 
         return response()->noContent();

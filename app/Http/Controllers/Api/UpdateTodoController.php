@@ -16,6 +16,9 @@ class UpdateTodoController extends Controller
         Todo $todo,
         UpdateTodoAction $action
     ) {
+
+        $this->authorize('update', $todo);
+
         $data = array_merge([
             'title' => $todo->title,
             'description' => $todo->description,

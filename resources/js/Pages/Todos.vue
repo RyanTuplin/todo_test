@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import axios from "axios";
+import { router } from "@inertiajs/vue3";
 import type { Todo, TodoFormData } from "@/types/todo";
+
+// Get CSRF token
+axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
 
 const todos = ref<Todo[]>([]);
 const isLoading = ref(false);
@@ -14,6 +18,10 @@ const form = ref<TodoFormData>({
 });
 
 const editingId = ref<number | null>(null);
+
+const logout = () => {
+  router.post("/logout");
+};
 
 const fetchTodos = async () => {
   isLoading.value = true;
@@ -40,7 +48,7 @@ const createTodo = async () => {
     const response = await axios.post("/api/todos", {
       title: form.value.title,
       description: form.value.description,
-      completed: form.value.completed || false, // Explicitly ensure it's false
+      completed: form.value.completed || false,
     });
     todos.value.unshift(response.data.data);
     resetForm();
@@ -139,121 +147,152 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100 py-8 px-4">
-    <div class="max-w-3xl mx-auto">
-      <h1 class="text-3xl font-bold text-gray-900 mb-8">Todo List</h1>
-
-      <!-- Error Message -->
-      <div
-        v-if="error"
-        class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
-      >
-        {{ error }}
-      </div>
-
-      <!-- Create/Edit Form -->
-      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 class="text-xl font-semibold mb-4">
-          {{ editingId ? "Edit Todo" : "Create New Todo" }}
-        </h2>
-
-        <form @submit.prevent="editingId ? saveEdit() : createTodo()">
-          <div class="mb-4">
-            <label class="block text-gray-700 text-sm font-bold mb-2"> Title </label>
-            <input
-              v-model="form.title"
-              type="text"
-              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              placeholder="Enter todo title"
-              required
-            />
+  <div class="min-h-screen bg-gray-100">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+          <div class="flex items-center">
+            <h1 class="text-xl font-bold text-gray-900">My Todo App</h1>
           </div>
-
-          <div class="mb-4">
-            <label class="block text-gray-700 text-sm font-bold mb-2">
-              Description
-            </label>
-            <textarea
-              v-model="form.description"
-              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              placeholder="Enter description (optional)"
-              rows="3"
-            ></textarea>
-          </div>
-
-          <div class="flex items-center justify-between">
-            <button
-              type="submit"
-              class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-              :disabled="isLoading"
+          <div class="flex items-center space-x-4">
+            <a
+              href="/profile"
+              class="text-gray-700 hover:text-gray-900 font-medium transition"
             >
-              {{ editingId ? "Update" : "Create" }} Todo
-            </button>
-
+              Profile
+            </a>
             <button
-              v-if="editingId"
-              type="button"
-              @click="cancelEdit"
-              class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              @click="logout"
+              class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded transition"
             >
-              Cancel
+              Logout
             </button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Todos List -->
-      <div class="space-y-4">
-        <div
-          v-for="todo in todos"
-          :key="todo.id"
-          class="bg-white rounded-lg shadow-md p-6"
-        >
-          <div class="flex items-start justify-between">
-            <div class="flex-1">
-              <div class="flex items-center mb-2">
-                <input
-                  type="checkbox"
-                  :checked="todo.completed"
-                  @change="toggleComplete(todo)"
-                  class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                />
-                <h3
-                  class="ml-3 text-lg font-semibold"
-                  :class="{ 'line-through text-gray-500': todo.completed }"
-                >
-                  {{ todo.title }}
-                </h3>
-              </div>
-
-              <p
-                v-if="todo.description"
-                class="text-gray-600 ml-8"
-                :class="{ 'line-through': todo.completed }"
-              >
-                {{ todo.description }}
-              </p>
-            </div>
-
-            <div class="flex space-x-2 ml-4">
-              <button @click="startEdit(todo)" class="text-blue-600 hover:text-blue-800">
-                Edit
-              </button>
-              <button
-                @click="deleteTodo(todo.id)"
-                class="text-red-600 hover:text-red-800"
-              >
-                Delete
-              </button>
-            </div>
           </div>
         </div>
+      </div>
+    </nav>
 
+    <!-- Main Content -->
+    <div class="py-8 px-4">
+      <div class="max-w-3xl mx-auto">
+        <h2 class="text-3xl font-bold text-gray-900 mb-8">My Todos</h2>
+
+        <!-- Error Message -->
         <div
-          v-if="todos.length === 0 && !isLoading"
-          class="text-center text-gray-500 py-8"
+          v-if="error"
+          class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
         >
-          No todos yet. Create your first one!
+          {{ error }}
+        </div>
+
+        <!-- Create/Edit Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h3 class="text-xl font-semibold mb-4">
+            {{ editingId ? "Edit Todo" : "Create New Todo" }}
+          </h3>
+
+          <form @submit.prevent="editingId ? saveEdit() : createTodo()">
+            <div class="mb-4">
+              <label class="block text-gray-700 text-sm font-bold mb-2"> Title </label>
+              <input
+                v-model="form.title"
+                type="text"
+                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                placeholder="Enter todo title"
+                required
+              />
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-gray-700 text-sm font-bold mb-2">
+                Description
+              </label>
+              <textarea
+                v-model="form.description"
+                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                placeholder="Enter description (optional)"
+                rows="3"
+              ></textarea>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <button
+                type="submit"
+                class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                :disabled="isLoading"
+              >
+                {{ editingId ? "Update" : "Create" }} Todo
+              </button>
+
+              <button
+                v-if="editingId"
+                type="button"
+                @click="cancelEdit"
+                class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Todos List -->
+        <div class="space-y-4">
+          <div
+            v-for="todo in todos"
+            :key="todo.id"
+            class="bg-white rounded-lg shadow-md p-6"
+          >
+            <div class="flex items-start justify-between">
+              <div class="flex-1">
+                <div class="flex items-center mb-2">
+                  <input
+                    type="checkbox"
+                    :checked="todo.completed"
+                    @change="toggleComplete(todo)"
+                    class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <h4
+                    class="ml-3 text-lg font-semibold"
+                    :class="{ 'line-through text-gray-500': todo.completed }"
+                  >
+                    {{ todo.title }}
+                  </h4>
+                </div>
+
+                <p
+                  v-if="todo.description"
+                  class="text-gray-600 ml-8"
+                  :class="{ 'line-through': todo.completed }"
+                >
+                  {{ todo.description }}
+                </p>
+              </div>
+
+              <div class="flex space-x-2 ml-4">
+                <button
+                  @click="startEdit(todo)"
+                  class="text-blue-600 hover:text-blue-800"
+                >
+                  Edit
+                </button>
+                <button
+                  @click="deleteTodo(todo.id)"
+                  class="text-red-600 hover:text-red-800"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-if="todos.length === 0 && !isLoading"
+            class="text-center text-gray-500 py-8"
+          >
+            No todos yet. Create your first one!
+          </div>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Actions\DeleteTodoAction;
 use App\Models\Todo;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -14,10 +15,12 @@ class DeleteTodoActionTest extends TestCase
     /** @test */
     public function it_deletes_a_todo()
     {
-        $todo = Todo::create([
+        $user = User::factory()->create();
+
+        $todo = Todo::factory()->for($user)->create([
             'title' => 'Test Todo',
             'description' => 'Test Description',
-            'completed' => false,
+            'completed' => 0,
         ]);
 
         $action = new DeleteTodoAction();

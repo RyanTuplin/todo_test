@@ -14,7 +14,8 @@ class ListTodosController extends Controller
      */
     public function __invoke(Request $request)
     {
-        $todos = Todo::orderBy('created_at', 'desc')->get();
+
+        $todos = $request->user()->todos()->orderBy('created_at', 'desc')->get();
 
         return TodoResource::collection($todos);
     }
