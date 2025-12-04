@@ -22,7 +22,7 @@ jobs:
       - name: Copy .env
         run: cp .env.example .env
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
 
       - name: Generate APP_KEY
