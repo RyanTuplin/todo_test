@@ -16,6 +16,6 @@ class StoreTodoController extends Controller
     {
         $todoData = TodoData::fromRequest($request->validated());
         $todo = $action->execute($todoData);
-        return new TodoResource($todo);
+        return (new TodoResource($todo))->response()->setStatusCode(201);
     }
 }

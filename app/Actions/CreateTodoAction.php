@@ -9,6 +9,11 @@ class CreateTodoAction
 {
    public function execute(TodoData $data): Todo
    {
-      return Todo::create($data->toArray());
+      // For create, ensure we have required fields
+      return Todo::create([
+         'title' => $data->title ?? '',
+         'description' => $data->description,
+         'completed' => $data->completed ?? false,
+      ]);
    }
 }

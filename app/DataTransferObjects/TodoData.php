@@ -4,7 +4,6 @@ namespace App\DataTransferObjects;
 
 class TodoData
 {
-
    public function __construct(
       public readonly string $title,
       public readonly ?string $description,
@@ -16,7 +15,7 @@ class TodoData
       return new self(
          title: $data['title'],
          description: $data['description'] ?? null,
-         completed: $data['completed'] ?? false,
+         completed: isset($data['completed']) ? (bool)$data['completed'] : false,
       );
    }
 
