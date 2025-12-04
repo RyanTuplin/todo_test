@@ -19,6 +19,7 @@ class TodoResource extends JsonResource
             'title' => $this->title,
             'description' => $this->description,
             'completed' => $this->completed,
+            'categories' => CategoryResource::collection($this->whenLoaded('categories')),
             'created_at' => $this->created_at->toISOString(),
             'updated_at' => $this->updated_at->toISOString(),
         ];

@@ -7,18 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-class Todo extends Model
+class Category extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'title',
-        'description',
-        'completed',
-    ];
-
-    protected $casts = [
-        'completed' => 'boolean',
+        'user_id',
+        'name',
+        'color',
     ];
 
     public function user(): BelongsTo
@@ -26,8 +22,8 @@ class Todo extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function categories(): BelongsToMany
+    public function todos(): BelongsToMany
     {
-        return $this->belongsToMany(Category::class)->withTimestamps();
+        return $this->belongsToMany(Todo::class)->withTimestamps();
     }
 }

@@ -26,6 +26,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/todos', function () {
         return Inertia::render('Todos');
     })->name('todos');
+
+    Route::get('/categories', function () {
+        return Inertia::render('Categories');
+    })->name('categories');
 });
 
 // Profile routes - require authentication

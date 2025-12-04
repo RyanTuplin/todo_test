@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import axios from "axios";
 import { router } from "@inertiajs/vue3";
-import type { Todo, TodoFormData } from "@/types/todo";
+import type { Todo, TodoFormData, Category } from "@/types/todo";
 
-// Get CSRF token
 axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
 
 const todos = ref<Todo[]>([]);
+const categories = ref<Category[]>([]);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
+const selectedCategoryFilter = ref<number | null>(null);
 
 const form = ref<TodoFormData>({
   title: "",
@@ -23,6 +24,16 @@ const logout = () => {
   router.post("/logout");
 };
 
+const filteredTodos = computed(() => {
+  if (selectedCategoryFilter.value === null) {
+    return todos.value;
+  }
+
+  return todos.value.filter((todo) =>
+    todo.categories?.some((cat) => cat.id === selectedCategoryFilter.value)
+  );
+});
+
 const fetchTodos = async () => {
   isLoading.value = true;
   error.value = null;
@@ -35,6 +46,15 @@ const fetchTodos = async () => {
     console.error(err);
   } finally {
     isLoading.value = false;
+  }
+};
+
+const fetchCategories = async () => {
+  try {
+    const response = await axios.get("/api/categories");
+    categories.value = response.data.data;
+  } catch (err) {
+    console.error("Failed to fetch categories", err);
   }
 };
 
@@ -105,6 +125,42 @@ const deleteTodo = async (id: number) => {
   }
 };
 
+const attachCategory = async (todoId: number, categoryId: number, event: Event) => {
+  try {
+    const response = await axios.post(`/api/todos/${todoId}/categories/${categoryId}`);
+    const index = todos.value.findIndex((t) => t.id === todoId);
+    if (index !== -1) {
+      todos.value[index] = response.data.data;
+    }
+
+    // Close the dropdown by finding the parent details element and closing it
+    const detailsElement = (event.target as HTMLElement).closest("details");
+    if (detailsElement) {
+      detailsElement.removeAttribute("open");
+    }
+  } catch (err) {
+    error.value = "Failed to add category";
+    console.error(err);
+  }
+};
+
+const detachCategory = async (todoId: number, categoryId: number) => {
+  try {
+    const response = await axios.delete(`/api/todos/${todoId}/categories/${categoryId}`);
+    const index = todos.value.findIndex((t) => t.id === todoId);
+    if (index !== -1) {
+      todos.value[index] = response.data.data;
+    }
+  } catch (err) {
+    error.value = "Failed to remove category";
+    console.error(err);
+  }
+};
+
+const hasCategoryAttached = (todo: Todo, categoryId: number): boolean => {
+  return todo.categories?.some((cat) => cat.id === categoryId) || false;
+};
+
 const startEdit = (todo: Todo) => {
   editingId.value = todo.id;
   form.value = {
@@ -143,6 +199,7 @@ const resetForm = () => {
 
 onMounted(() => {
   fetchTodos();
+  fetchCategories();
 });
 </script>
 
@@ -156,6 +213,13 @@ onMounted(() => {
             <h1 class="text-xl font-bold text-gray-900">My Todo App</h1>
           </div>
           <div class="flex items-center space-x-4">
+            <a href="/todos" class="text-blue-600 font-medium"> Todos </a>
+            <a
+              href="/categories"
+              class="text-gray-700 hover:text-gray-900 font-medium transition"
+            >
+              Categories
+            </a>
             <a
               href="/profile"
               class="text-gray-700 hover:text-gray-900 font-medium transition"
@@ -175,8 +239,47 @@ onMounted(() => {
 
     <!-- Main Content -->
     <div class="py-8 px-4">
-      <div class="max-w-3xl mx-auto">
-        <h2 class="text-3xl font-bold text-gray-900 mb-8">My Todos</h2>
+      <div class="max-w-4xl mx-auto">
+        <h2 class="text-3xl font-bold text-gray-900 mb-6">My Todos</h2>
+
+        <!-- Category Filter -->
+        <div v-if="categories.length > 0" class="mb-6">
+          <div class="flex flex-wrap gap-2">
+            <button
+              @click="selectedCategoryFilter = null"
+              class="px-4 py-2 rounded-full font-medium transition"
+              :class="
+                selectedCategoryFilter === null
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100'
+              "
+            >
+              All Todos
+            </button>
+            <button
+              v-for="category in categories"
+              :key="category.id"
+              @click="selectedCategoryFilter = category.id"
+              class="px-4 py-2 rounded-full font-medium transition flex items-center space-x-2"
+              :class="
+                selectedCategoryFilter === category.id
+                  ? 'text-white ring-2 ring-offset-2'
+                  : 'bg-white hover:opacity-80'
+              "
+              :style="
+                selectedCategoryFilter === category.id
+                  ? { backgroundColor: category.color, borderColor: category.color }
+                  : { backgroundColor: category.color + '20', color: category.color }
+              "
+            >
+              <span
+                class="w-3 h-3 rounded-full"
+                :style="{ backgroundColor: category.color }"
+              ></span>
+              <span>{{ category.name }}</span>
+            </button>
+          </div>
+        </div>
 
         <!-- Error Message -->
         <div
@@ -240,11 +343,11 @@ onMounted(() => {
         <!-- Todos List -->
         <div class="space-y-4">
           <div
-            v-for="todo in todos"
+            v-for="todo in filteredTodos"
             :key="todo.id"
             class="bg-white rounded-lg shadow-md p-6"
           >
-            <div class="flex items-start justify-between">
+            <div class="flex items-start justify-between mb-3">
               <div class="flex-1">
                 <div class="flex items-center mb-2">
                   <input
@@ -285,13 +388,76 @@ onMounted(() => {
                 </button>
               </div>
             </div>
+
+            <!-- Categories -->
+            <div v-if="categories.length > 0" class="ml-8 mt-3">
+              <div class="flex flex-wrap gap-2 mb-2">
+                <span
+                  v-for="category in todo.categories"
+                  :key="category.id"
+                  class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-white"
+                  :style="{ backgroundColor: category.color }"
+                >
+                  {{ category.name }}
+                  <button
+                    @click="detachCategory(todo.id, category.id)"
+                    class="ml-2 hover:bg-black hover:bg-opacity-20 rounded-full p-0.5"
+                  >
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path
+                        fill-rule="evenodd"
+                        d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                        clip-rule="evenodd"
+                      ></path>
+                    </svg>
+                  </button>
+                </span>
+              </div>
+
+              <!-- Add Category Dropdown -->
+              <details class="relative">
+                <summary
+                  class="text-sm text-blue-600 hover:text-blue-800 cursor-pointer list-none"
+                >
+                  + Add Category
+                </summary>
+                <div
+                  class="absolute z-10 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 p-2 min-w-[200px]"
+                >
+                  <button
+                    v-for="category in categories.filter(
+                      (c) => !hasCategoryAttached(todo, c.id)
+                    )"
+                    :key="category.id"
+                    @click="attachCategory(todo.id, category.id, $event)"
+                    class="w-full text-left px-3 py-2 rounded hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <span
+                      class="w-4 h-4 rounded-full"
+                      :style="{ backgroundColor: category.color }"
+                    ></span>
+                    <span>{{ category.name }}</span>
+                  </button>
+                  <div
+                    v-if="
+                      categories.filter((c) => !hasCategoryAttached(todo, c.id))
+                        .length === 0
+                    "
+                    class="text-sm text-gray-500 px-3 py-2"
+                  >
+                    All categories added
+                  </div>
+                </div>
+              </details>
+            </div>
           </div>
 
           <div
-            v-if="todos.length === 0 && !isLoading"
+            v-if="filteredTodos.length === 0 && !isLoading"
             class="text-center text-gray-500 py-8"
           >
-            No todos yet. Create your first one!
+            <p v-if="selectedCategoryFilter">No todos in this category.</p>
+            <p v-else>No todos yet. Create your first one!</p>
           </div>
         </div>
       </div>
