@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Priority;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreTodoRequest extends FormRequest
 {
@@ -17,6 +19,8 @@ class StoreTodoRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'completed' => ['sometimes', 'nullable', 'boolean'],
+            'priority' => ['nullable', Rule::enum(Priority::class)],
+            'due_date' => ['nullable', 'date', 'after_or_equal:today'],
         ];
     }
 
@@ -28,5 +32,12 @@ class StoreTodoRequest extends FormRequest
                 'completed' => false,
             ]);
         }
+    }
+
+    public function messages(): array
+    {
+        return [
+            'due_date.after_or_equal' => 'The due date must be today or a future date.',
+        ];
     }
 }

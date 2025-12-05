@@ -56,7 +56,9 @@ class TodoDataTest extends TestCase
       $todoData = new TodoData(
          title: 'Test Todo',
          description: 'Test Description',
-         completed: true
+         completed: true,
+         priority: null,
+         due_date: null,
       );
 
       $array = $todoData->toArray();
@@ -65,6 +67,8 @@ class TodoDataTest extends TestCase
          'title' => 'Test Todo',
          'description' => 'Test Description',
          'completed' => true,
+         'priority' => null,
+         'due_date' => null,
       ], $array);
    }
 }

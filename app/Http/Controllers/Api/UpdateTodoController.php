@@ -16,14 +16,22 @@ class UpdateTodoController extends Controller
         Todo $todo,
         UpdateTodoAction $action
     ) {
-
         $this->authorize('update', $todo);
 
-        $data = array_merge([
+        // Start with existing todo data
+        $data = [
             'title' => $todo->title,
             'description' => $todo->description,
             'completed' => $todo->completed,
-        ], $request->validated());
+            'priority' => $todo->priority?->value,
+            'due_date' => $todo->due_date?->format('Y-m-d'),
+        ];
+
+        $validated = $request->validated();
+
+        foreach ($validated as $key => $value) {
+            $data[$key] = $value;
+        }
 
         $todoData = TodoData::fromRequest($data);
 

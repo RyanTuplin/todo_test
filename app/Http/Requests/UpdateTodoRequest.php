@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Priority;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateTodoRequest extends FormRequest
 {
@@ -17,6 +19,8 @@ class UpdateTodoRequest extends FormRequest
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
             'completed' => ['sometimes', 'boolean'],
+            'priority' => ['sometimes', 'nullable', Rule::enum(Priority::class)],
+            'due_date' => ['sometimes', 'nullable', 'date'],
         ];
     }
 }

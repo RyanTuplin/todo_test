@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from "vue";
 import axios from "axios";
 import { router } from "@inertiajs/vue3";
-import type { Todo, TodoFormData, Category } from "@/types/todo";
+import type { Todo, TodoFormData, Category, Priority } from "@/types/todo";
 
 axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
 
@@ -11,11 +11,15 @@ const categories = ref<Category[]>([]);
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 const selectedCategoryFilter = ref<number | null>(null);
+const selectedPriorityFilter = ref<Priority | null>(null);
+const selectedStatusFilter = ref<string | null>(null);
 
 const form = ref<TodoFormData>({
   title: "",
   description: "",
   completed: false,
+  priority: null,
+  due_date: null,
 });
 
 const editingId = ref<number | null>(null);
@@ -25,13 +29,30 @@ const logout = () => {
 };
 
 const filteredTodos = computed(() => {
-  if (selectedCategoryFilter.value === null) {
-    return todos.value;
+  let filtered = todos.value;
+
+  // Filter by category
+  if (selectedCategoryFilter.value !== null) {
+    filtered = filtered.filter((todo) =>
+      todo.categories?.some((cat) => cat.id === selectedCategoryFilter.value)
+    );
   }
 
-  return todos.value.filter((todo) =>
-    todo.categories?.some((cat) => cat.id === selectedCategoryFilter.value)
-  );
+  // Filter by priority
+  if (selectedPriorityFilter.value !== null) {
+    filtered = filtered.filter((todo) => todo.priority === selectedPriorityFilter.value);
+  }
+
+  // Filter by status
+  if (selectedStatusFilter.value) {
+    if (selectedStatusFilter.value === "overdue") {
+      filtered = filtered.filter((todo) => todo.is_overdue);
+    } else if (selectedStatusFilter.value === "due_today") {
+      filtered = filtered.filter((todo) => todo.is_due_today);
+    }
+  }
+
+  return filtered;
 });
 
 const fetchTodos = async () => {
@@ -69,6 +90,8 @@ const createTodo = async () => {
       title: form.value.title,
       description: form.value.description,
       completed: form.value.completed || false,
+      priority: form.value.priority,
+      due_date: form.value.due_date,
     });
     todos.value.unshift(response.data.data);
     resetForm();
@@ -89,6 +112,8 @@ const updateTodo = async (todo: Todo) => {
       title: todo.title,
       description: todo.description,
       completed: todo.completed,
+      priority: todo.priority,
+      due_date: todo.due_date,
     });
 
     const index = todos.value.findIndex((t) => t.id === todo.id);
@@ -133,7 +158,6 @@ const attachCategory = async (todoId: number, categoryId: number, event: Event) 
       todos.value[index] = response.data.data;
     }
 
-    // Close the dropdown by finding the parent details element and closing it
     const detailsElement = (event.target as HTMLElement).closest("details");
     if (detailsElement) {
       detailsElement.removeAttribute("open");
@@ -167,6 +191,8 @@ const startEdit = (todo: Todo) => {
     title: todo.title,
     description: todo.description || "",
     completed: todo.completed,
+    priority: todo.priority,
+    due_date: todo.due_date,
   };
 };
 
@@ -194,7 +220,15 @@ const resetForm = () => {
     title: "",
     description: "",
     completed: false,
+    priority: null,
+    due_date: null,
   };
+};
+
+const clearFilters = () => {
+  selectedCategoryFilter.value = null;
+  selectedPriorityFilter.value = null;
+  selectedStatusFilter.value = null;
 };
 
 onMounted(() => {
@@ -242,42 +276,154 @@ onMounted(() => {
       <div class="max-w-4xl mx-auto">
         <h2 class="text-3xl font-bold text-gray-900 mb-6">My Todos</h2>
 
-        <!-- Category Filter -->
-        <div v-if="categories.length > 0" class="mb-6">
-          <div class="flex flex-wrap gap-2">
+        <!-- Filters Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Filters</h3>
             <button
-              @click="selectedCategoryFilter = null"
-              class="px-4 py-2 rounded-full font-medium transition"
-              :class="
-                selectedCategoryFilter === null
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100'
+              v-if="
+                selectedCategoryFilter || selectedPriorityFilter || selectedStatusFilter
               "
+              @click="clearFilters"
+              class="text-sm text-blue-600 hover:text-blue-800"
             >
-              All Todos
+              Clear All
             </button>
-            <button
-              v-for="category in categories"
-              :key="category.id"
-              @click="selectedCategoryFilter = category.id"
-              class="px-4 py-2 rounded-full font-medium transition flex items-center space-x-2"
-              :class="
-                selectedCategoryFilter === category.id
-                  ? 'text-white ring-2 ring-offset-2'
-                  : 'bg-white hover:opacity-80'
-              "
-              :style="
-                selectedCategoryFilter === category.id
-                  ? { backgroundColor: category.color, borderColor: category.color }
-                  : { backgroundColor: category.color + '20', color: category.color }
-              "
-            >
-              <span
-                class="w-3 h-3 rounded-full"
-                :style="{ backgroundColor: category.color }"
-              ></span>
-              <span>{{ category.name }}</span>
-            </button>
+          </div>
+
+          <!-- Status Filter -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                @click="selectedStatusFilter = null"
+                class="px-4 py-2 rounded-full font-medium text-sm transition"
+                :class="
+                  selectedStatusFilter === null
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                "
+              >
+                All
+              </button>
+              <button
+                @click="selectedStatusFilter = 'overdue'"
+                class="px-4 py-2 rounded-full font-medium text-sm transition"
+                :class="
+                  selectedStatusFilter === 'overdue'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-white border border-red-300 text-red-600 hover:bg-red-50'
+                "
+              >
+                Overdue
+              </button>
+              <button
+                @click="selectedStatusFilter = 'due_today'"
+                class="px-4 py-2 rounded-full font-medium text-sm transition"
+                :class="
+                  selectedStatusFilter === 'due_today'
+                    ? 'bg-orange-600 text-white'
+                    : 'bg-white border border-orange-300 text-orange-600 hover:bg-orange-50'
+                "
+              >
+                Due Today
+              </button>
+            </div>
+          </div>
+
+          <!-- Priority Filter -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                @click="selectedPriorityFilter = null"
+                class="px-4 py-2 rounded-full font-medium text-sm transition"
+                :class="
+                  selectedPriorityFilter === null
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                "
+              >
+                All Priorities
+              </button>
+              <button
+                @click="selectedPriorityFilter = 'high'"
+                class="px-4 py-2 rounded-full font-medium text-sm transition"
+                :class="
+                  selectedPriorityFilter === 'high'
+                    ? 'bg-red-500 text-white'
+                    : 'bg-white border border-red-300 text-red-600 hover:bg-red-50'
+                "
+              >
+                High
+              </button>
+              <button
+                @click="selectedPriorityFilter = 'medium'"
+                class="px-4 py-2 rounded-full font-medium text-sm transition"
+                :class="
+                  selectedPriorityFilter === 'medium'
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-white border border-orange-300 text-orange-600 hover:bg-orange-50'
+                "
+              >
+                Medium
+              </button>
+              <button
+                @click="selectedPriorityFilter = 'low'"
+                class="px-4 py-2 rounded-full font-medium text-sm transition"
+                :class="
+                  selectedPriorityFilter === 'low'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-white border border-green-300 text-green-600 hover:bg-green-50'
+                "
+              >
+                Low
+              </button>
+            </div>
+          </div>
+
+          <!-- Category Filter -->
+          <div v-if="categories.length > 0">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                @click="selectedCategoryFilter = null"
+                class="px-4 py-2 rounded-full font-medium text-sm transition"
+                :class="
+                  selectedCategoryFilter === null
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                "
+              >
+                All Categories
+              </button>
+              <button
+                v-for="category in categories"
+                :key="category.id"
+                @click="selectedCategoryFilter = category.id"
+                class="px-4 py-2 rounded-full font-medium text-sm transition flex items-center space-x-2"
+                :class="
+                  selectedCategoryFilter === category.id
+                    ? 'text-white ring-2 ring-offset-2'
+                    : 'bg-white hover:opacity-80'
+                "
+                :style="
+                  selectedCategoryFilter === category.id
+                    ? { backgroundColor: category.color, borderColor: category.color }
+                    : {
+                        backgroundColor: category.color + '20',
+                        color: category.color,
+                        border: `1px solid ${category.color}`,
+                      }
+                "
+              >
+                <span
+                  class="w-3 h-3 rounded-full"
+                  :style="{ backgroundColor: category.color }"
+                ></span>
+                <span>{{ category.name }}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -319,6 +465,71 @@ onMounted(() => {
               ></textarea>
             </div>
 
+            <!-- Priority Selection -->
+            <div class="mb-4">
+              <label class="block text-gray-700 text-sm font-bold mb-2"> Priority </label>
+              <div class="flex space-x-2">
+                <button
+                  type="button"
+                  @click="form.priority = null"
+                  class="flex-1 py-2 px-4 rounded font-medium transition"
+                  :class="
+                    form.priority === null
+                      ? 'bg-gray-200 text-gray-800'
+                      : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+                  "
+                >
+                  None
+                </button>
+                <button
+                  type="button"
+                  @click="form.priority = 'high'"
+                  class="flex-1 py-2 px-4 rounded font-medium transition"
+                  :class="
+                    form.priority === 'high'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-white border border-red-300 text-red-600 hover:bg-red-50'
+                  "
+                >
+                  High
+                </button>
+                <button
+                  type="button"
+                  @click="form.priority = 'medium'"
+                  class="flex-1 py-2 px-4 rounded font-medium transition"
+                  :class="
+                    form.priority === 'medium'
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-white border border-orange-300 text-orange-600 hover:bg-orange-50'
+                  "
+                >
+                  Medium
+                </button>
+                <button
+                  type="button"
+                  @click="form.priority = 'low'"
+                  class="flex-1 py-2 px-4 rounded font-medium transition"
+                  :class="
+                    form.priority === 'low'
+                      ? 'bg-green-500 text-white'
+                      : 'bg-white border border-green-300 text-green-600 hover:bg-green-50'
+                  "
+                >
+                  Low
+                </button>
+              </div>
+            </div>
+
+            <!-- Due Date -->
+            <div class="mb-4">
+              <label class="block text-gray-700 text-sm font-bold mb-2"> Due Date </label>
+              <input
+                v-model="form.due_date"
+                type="date"
+                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              />
+            </div>
+
             <div class="flex items-center justify-between">
               <button
                 type="submit"
@@ -346,6 +557,10 @@ onMounted(() => {
             v-for="todo in filteredTodos"
             :key="todo.id"
             class="bg-white rounded-lg shadow-md p-6"
+            :class="{
+              'border-l-4 border-red-500': todo.is_overdue,
+              'border-l-4 border-orange-500': todo.is_due_today && !todo.is_overdue,
+            }"
           >
             <div class="flex items-start justify-between mb-3">
               <div class="flex-1">
@@ -362,6 +577,36 @@ onMounted(() => {
                   >
                     {{ todo.title }}
                   </h4>
+
+                  <!-- Priority Badge -->
+                  <span
+                    v-if="todo.priority"
+                    class="ml-3 px-3 py-1 rounded-full text-xs font-bold text-white"
+                    :style="{ backgroundColor: todo.priority_color }"
+                  >
+                    {{ todo.priority_label }}
+                  </span>
+
+                  <!-- Overdue Badge -->
+                  <span
+                    v-if="todo.is_overdue"
+                    class="ml-2 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800"
+                  >
+                    OVERDUE
+                  </span>
+
+                  <!-- Due Today Badge -->
+                  <span
+                    v-else-if="todo.is_due_today"
+                    class="ml-2 px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800"
+                  >
+                    DUE TODAY
+                  </span>
+                </div>
+
+                <!-- Due Date Display -->
+                <div v-if="todo.due_date" class="ml-8 text-sm text-gray-600 mb-2">
+                  <span class="font-medium">Due:</span> {{ todo.due_date_formatted }}
                 </div>
 
                 <p
@@ -456,7 +701,13 @@ onMounted(() => {
             v-if="filteredTodos.length === 0 && !isLoading"
             class="text-center text-gray-500 py-8"
           >
-            <p v-if="selectedCategoryFilter">No todos in this category.</p>
+            <p
+              v-if="
+                selectedCategoryFilter || selectedPriorityFilter || selectedStatusFilter
+              "
+            >
+              No todos match your filters.
+            </p>
             <p v-else>No todos yet. Create your first one!</p>
           </div>
         </div>

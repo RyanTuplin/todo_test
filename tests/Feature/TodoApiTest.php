@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Priority;
 use App\Models\Todo;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -282,5 +284,282 @@ class TodoApiTest extends TestCase
       $response = $this->actingAs($this->user)->deleteJson('/api/todos/999');
 
       $response->assertStatus(404);
+   }
+   /** @test */
+   public function it_can_create_a_todo_with_priority()
+   {
+      $data = [
+         'title' => 'High Priority Task',
+         'priority' => Priority::HIGH->value,
+      ];
+
+      $response = $this->actingAs($this->user)->postJson('/api/todos', $data);
+
+      $response->assertStatus(201)
+         ->assertJson([
+            'data' => [
+               'title' => 'High Priority Task',
+               'priority' => Priority::HIGH->value,
+               'priority_label' => 'High',
+            ]
+         ]);
+
+      $this->assertDatabaseHas('todos', [
+         'user_id' => $this->user->id,
+         'title' => 'High Priority Task',
+         'priority' => Priority::HIGH->value,
+      ]);
+   }
+
+   /** @test */
+   public function it_can_create_a_todo_with_due_date()
+   {
+      $dueDate = Carbon::tomorrow()->format('Y-m-d');
+
+      $data = [
+         'title' => 'Task with deadline',
+         'due_date' => $dueDate,
+      ];
+
+      $response = $this->actingAs($this->user)->postJson('/api/todos', $data);
+
+      $response->assertStatus(201)
+         ->assertJson([
+            'data' => [
+               'title' => 'Task with deadline',
+               'due_date' => $dueDate,
+            ]
+         ]);
+
+      $todo = Todo::where('title', 'Task with deadline')->first();
+      $this->assertTrue($todo->due_date->isSameDay(Carbon::parse($dueDate)));
+   }
+
+   /** @test */
+   public function it_validates_priority_must_be_valid_enum()
+   {
+      $response = $this->actingAs($this->user)->postJson('/api/todos', [
+         'title' => 'Test',
+         'priority' => 'invalid',
+      ]);
+
+      $response->assertStatus(422)
+         ->assertJsonValidationErrors(['priority']);
+   }
+
+   /** @test */
+   public function it_validates_due_date_must_not_be_in_past()
+   {
+      $response = $this->actingAs($this->user)->postJson('/api/todos', [
+         'title' => 'Test',
+         'due_date' => Carbon::yesterday()->format('Y-m-d'),
+      ]);
+
+      $response->assertStatus(422)
+         ->assertJsonValidationErrors(['due_date']);
+   }
+
+   /** @test */
+   public function it_can_update_todo_priority()
+   {
+      $todo = Todo::factory()->for($this->user)->create([
+         'priority' => Priority::LOW->value,
+      ]);
+
+      $response = $this->actingAs($this->user)->putJson("/api/todos/{$todo->id}", [
+         'priority' => Priority::HIGH->value,
+      ]);
+
+      $response->assertStatus(200)
+         ->assertJson([
+            'data' => [
+               'priority' => Priority::HIGH->value,
+            ]
+         ]);
+
+      $this->assertDatabaseHas('todos', [
+         'id' => $todo->id,
+         'priority' => Priority::HIGH->value,
+      ]);
+   }
+
+   /** @test */
+   public function it_can_update_todo_due_date()
+   {
+      $todo = Todo::factory()->for($this->user)->create([
+         'due_date' => Carbon::today(),
+      ]);
+
+      $newDueDate = Carbon::tomorrow()->format('Y-m-d');
+
+      $response = $this->actingAs($this->user)->putJson("/api/todos/{$todo->id}", [
+         'due_date' => $newDueDate,
+      ]);
+
+      $response->assertStatus(200)
+         ->assertJson([
+            'data' => [
+               'due_date' => $newDueDate,
+            ]
+         ]);
+
+      $this->assertTrue($todo->fresh()->due_date->isSameDay(Carbon::parse($newDueDate)));
+   }
+
+   /** @test */
+   public function it_can_remove_priority_from_todo()
+   {
+      $todo = Todo::factory()->for($this->user)->create([
+         'priority' => Priority::HIGH->value,
+      ]);
+
+      $response = $this->actingAs($this->user)->putJson("/api/todos/{$todo->id}", [
+         'priority' => null,
+      ]);
+
+      $response->assertStatus(200)
+         ->assertJson([
+            'data' => [
+               'priority' => null,
+            ]
+         ]);
+
+      $todo->refresh();
+      $this->assertNull($todo->priority);
+   }
+
+   /** @test */
+   public function it_can_remove_due_date_from_todo()
+   {
+      $todo = Todo::factory()->for($this->user)->create([
+         'due_date' => Carbon::tomorrow(),
+      ]);
+
+      $response = $this->actingAs($this->user)->putJson("/api/todos/{$todo->id}", [
+         'due_date' => null,
+      ]);
+
+      $response->assertStatus(200)
+         ->assertJson([
+            'data' => [
+               'due_date' => null,
+            ]
+         ]);
+
+      $todo->refresh();
+      $this->assertNull($todo->due_date);
+   }
+
+   /** @test */
+   public function it_includes_overdue_status_in_response()
+   {
+      $todo = Todo::factory()->for($this->user)->overdue()->create();
+
+      $response = $this->actingAs($this->user)->getJson("/api/todos/{$todo->id}");
+
+      $response->assertStatus(200)
+         ->assertJson([
+            'data' => [
+               'is_overdue' => true,
+            ]
+         ]);
+   }
+
+   /** @test */
+   public function it_includes_due_today_status_in_response()
+   {
+      $todo = Todo::factory()->for($this->user)->dueToday()->create();
+
+      $response = $this->actingAs($this->user)->getJson("/api/todos/{$todo->id}");
+
+      $response->assertStatus(200)
+         ->assertJson([
+            'data' => [
+               'is_due_today' => true,
+            ]
+         ]);
+   }
+
+   /** @test */
+   public function it_can_filter_todos_by_priority()
+   {
+      Todo::factory()->for($this->user)->highPriority()->create();
+      Todo::factory()->for($this->user)->highPriority()->create();
+      Todo::factory()->for($this->user)->mediumPriority()->create();
+
+      $response = $this->actingAs($this->user)
+         ->getJson('/api/todos?priority=' . Priority::HIGH->value);
+
+      $response->assertStatus(200)
+         ->assertJsonCount(2, 'data');
+   }
+
+   /** @test */
+   public function it_can_filter_overdue_todos()
+   {
+      Todo::factory()->for($this->user)->overdue()->create();
+      Todo::factory()->for($this->user)->overdue()->create();
+      Todo::factory()->for($this->user)->dueSoon()->create();
+
+      $response = $this->actingAs($this->user)->getJson('/api/todos?status=overdue');
+
+      $response->assertStatus(200)
+         ->assertJsonCount(2, 'data');
+   }
+
+   /** @test */
+   public function it_can_filter_due_today_todos()
+   {
+      Todo::factory()->for($this->user)->dueToday()->create();
+      Todo::factory()->for($this->user)->dueSoon()->create();
+
+      $response = $this->actingAs($this->user)->getJson('/api/todos?status=due_today');
+
+      $response->assertStatus(200)
+         ->assertJsonCount(1, 'data');
+   }
+
+   /** @test */
+   public function it_can_sort_todos_by_due_date()
+   {
+      $todo1 = Todo::factory()->for($this->user)->create([
+         'title' => 'First',
+         'due_date' => Carbon::today()->addDays(3),
+      ]);
+
+      $todo2 = Todo::factory()->for($this->user)->create([
+         'title' => 'Second',
+         'due_date' => Carbon::today()->addDays(1),
+      ]);
+
+      $todo3 = Todo::factory()->for($this->user)->create([
+         'title' => 'Third',
+         'due_date' => Carbon::today()->addDays(2),
+      ]);
+
+      $response = $this->actingAs($this->user)
+         ->getJson('/api/todos?sort_by=due_date&sort_order=asc');
+
+      $response->assertStatus(200);
+
+      $data = $response->json('data');
+      $this->assertEquals('Second', $data[0]['title']);
+      $this->assertEquals('Third', $data[1]['title']);
+      $this->assertEquals('First', $data[2]['title']);
+   }
+
+   /** @test */
+   public function it_includes_priority_color_in_response()
+   {
+      $todo = Todo::factory()->for($this->user)->highPriority()->create();
+
+      $response = $this->actingAs($this->user)->getJson("/api/todos/{$todo->id}");
+
+      $response->assertStatus(200)
+         ->assertJson([
+            'data' => [
+               'priority_color' => '#EF4444',
+            ]
+         ]);
    }
 }
