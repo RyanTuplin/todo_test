@@ -3,7 +3,8 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vue-tsc && vite build"
+        "build": "vue-tsc && vite build",
+        "build:ci": "vite build"
     },
     "devDependencies": {
         "@inertiajs/vue3": "^1.0.0",
